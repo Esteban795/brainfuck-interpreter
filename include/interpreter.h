@@ -14,7 +14,7 @@ struct state {
     byte* arr;
     int ptr;
     char* cmds;
-    char* cmds_count;
+    size_t cmds_count;
 };
 
 typedef struct state bf_state;
@@ -25,4 +25,3 @@ void destroyInterpreter(bf_state** state);
 
 void runInterpreter(bf_state* state);
 #endif
-
