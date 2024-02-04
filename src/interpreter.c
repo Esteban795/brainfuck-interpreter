@@ -81,8 +81,17 @@ bf_state* createInterpreter(const char* source_path){
     return state;
 }
 
+
+void destroyInterpreter(bf_state** state){
+    free((*state)->arr);
+    free((*state)->cmds);
+    free(*state);
+    *state = NULL; //makes sure cannot be double freed
+}
+
 int main(void){
     bf_state* state = createInterpreter("./examples/helloworld.bf");
+    destroyInterpreter(&state);
     if (state == NULL){
         return 1;
     }
