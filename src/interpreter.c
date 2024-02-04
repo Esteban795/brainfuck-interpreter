@@ -24,6 +24,7 @@ static size_t countCmds(FILE* f){
     return count;
 }
 
+//Assumes f is a valid file pointer
 static int removeNonCodeChar(bf_state* state,FILE* f){
     size_t cmds_count = countCmds(f);
     state->cmds_count = cmds_count;
@@ -31,6 +32,7 @@ static int removeNonCodeChar(bf_state* state,FILE* f){
     if (state->cmds == NULL){
         fprintf(stderr, "Error: Could not allocate memory for cmds\n");
         fclose(f);
+        destroyInterpreter(&state);
         return 1;
     }
     char c;
@@ -50,7 +52,6 @@ static int removeNonCodeChar(bf_state* state,FILE* f){
                 break;
         }
     }
-    printf("cmds: %s\n", state->cmds);
     rewind(f);
     return 0;
 }
@@ -77,8 +78,7 @@ bf_state* createInterpreter(const char* source_path){
         return NULL;
     }
     state->ptr = 0;
-    removeNonCodeChar(state, f);
-    return state;
+    return removeNonCodeChar(state, f) == 0 ? state : NULL;
 }
 
 
@@ -89,6 +89,46 @@ void destroyInterpreter(bf_state** state){
     *state = NULL; //makes sure cannot be double freed
 }
 
+int runInterpreter(bf_state* state){
+    int ptr = 0;
+    if (state == NULL){
+        fprintf(stderr, "Error: state is NULL. It means that something went south when reading cmds.\n");
+        return 1;
+    }
+    while (state->cmds[ptr]) {
+        switch (state->cmds[ptr]) {
+        case '>':
+            state->ptr++;
+            ptr++;
+            break;
+        case '<':
+            state->ptr--;
+            ptr--;
+            break;
+        case '+':
+            state->arr[state->ptr]++;
+            ptr++;
+            break;
+        case '-':
+            state->arr[state->ptr]--;
+            ptr++;
+            break;
+        case '.':
+            putc(state->arr[state->ptr],stdout);
+            ptr++;
+            break;
+        case ',':
+            scanf("%c",&state->arr[state->ptr]);
+            ptr++;
+            break;
+        }
+        if (state->ptr < 0) {
+            fprintf(stderr,"Out of bounds access.");
+            destroyInterpreter(&state);
+            exit(1);
+        }
+    }
+}
 int main(void){
     bf_state* state = createInterpreter("./examples/helloworld.bf");
     destroyInterpreter(&state);
