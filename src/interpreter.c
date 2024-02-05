@@ -56,8 +56,6 @@ static int removeNonCodeChar(bf_state* state,FILE* f){
     return 0;
 }
 
-
-
 bf_state* createInterpreter(const char* source_path){
     FILE* f = fopen(source_path, "rb");
     if (f == NULL){
@@ -70,7 +68,7 @@ bf_state* createInterpreter(const char* source_path){
         fclose(f);
         return NULL;
     }
-    state->arr = malloc(MAX_ARRAY_SIZE * sizeof(byte));
+    state->arr = calloc(MAX_ARRAY_SIZE,sizeof(byte));
     if (state->arr == NULL) {
         fprintf(stderr, "Error: Could not allocate memory for 'state->arr'\n");
         free(state);
@@ -89,51 +87,102 @@ void destroyInterpreter(bf_state** state){
     *state = NULL; //makes sure cannot be double freed
 }
 
-int runInterpreter(bf_state* state){
-    int ptr = 0;
-    if (state == NULL){
-        fprintf(stderr, "Error: state is NULL. It means that something went south when reading cmds.\n");
-        return 1;
-    }
-    while (state->cmds[ptr]) {
-        switch (state->cmds[ptr]) {
-        case '>':
-            state->ptr++;
-            ptr++;
+
+static void goToOpeningBracket(bf_state *bfp, int *cptr) {
+    int nest = 0;
+    while (bfp->cmds[*cptr]) {
+        if (bfp->cmds[*cptr] == ']') {
+            nest += 1;
+        } else if (bfp->cmds[*cptr] == '[' && nest > 0) {
+            nest -= 1;
+        } else if (bfp->cmds[*cptr] == '[' && nest == 0)
             break;
-        case '<':
-            state->ptr--;
-            ptr--;
-            break;
-        case '+':
-            state->arr[state->ptr]++;
-            ptr++;
-            break;
-        case '-':
-            state->arr[state->ptr]--;
-            ptr++;
-            break;
-        case '.':
-            putc(state->arr[state->ptr],stdout);
-            ptr++;
-            break;
-        case ',':
-            scanf("%c",&state->arr[state->ptr]);
-            ptr++;
-            break;
-        }
-        if (state->ptr < 0) {
-            fprintf(stderr,"Out of bounds access.");
-            destroyInterpreter(&state);
-            exit(1);
-        }
+
+        *cptr -= 1;
     }
 }
-int main(void){
-    bf_state* state = createInterpreter("./examples/helloworld.bf");
-    destroyInterpreter(&state);
-    if (state == NULL){
-        return 1;
+
+static void goToClosingBracket(bf_state *bfp, int *cptr) {
+    int nest = 0;
+    while (bfp->cmds[*cptr]) {
+        if (bfp->cmds[*cptr] == '[') {
+            nest += 1;
+        } else if (bfp->cmds[*cptr] == ']' && nest > 0) {
+            nest -= 1;
+        } else if (bfp->cmds[*cptr] == ']' && nest == 0)
+            break;
+
+        *cptr += 1;
     }
+}
+int runInterpreter(bf_state* state){
+    int cmd_ptr = 0;
+    while (state->cmds[cmd_ptr]) {
+        switch (state->cmds[cmd_ptr]) {
+            case '>':
+                state->ptr++;
+                cmd_ptr++;
+                break;
+            case '<':
+                state->ptr--;
+                cmd_ptr++;
+                break;
+            case '+':
+                state->arr[state->ptr] += 1;
+                cmd_ptr++;
+                break;
+            case '-':
+                state->arr[state->ptr] -= 1;
+                cmd_ptr++;
+                break;
+            case '.':
+                putc(state->arr[state->ptr],stdout);
+                cmd_ptr++;
+                break;
+            case ',':
+                scanf("%c",&state->arr[state->ptr]);
+                cmd_ptr++;
+                break;
+            case '[':
+                if (state->arr[state->ptr] == 0){ //loop is done, go to the end of the loop
+                    cmd_ptr++; //we skip the first '[' because it will affect how next function works
+                    goToClosingBracket(state,&cmd_ptr);
+                    cmd_ptr++; // skip ']' because the loop is done
+                } else { //loop is not done, read loop instructions
+                    cmd_ptr++; 
+                }
+                break;
+            case ']':
+                if (state->arr[state->ptr] != 0){ //loop is not done, go the start
+                    cmd_ptr--;
+                    goToOpeningBracket(state,&cmd_ptr);
+                    cmd_ptr++;
+                } else { //loop's done, continue the program
+                    cmd_ptr++;
+                }
+                break;
+        }
+        if (state->ptr < 0) {
+            fprintf(stderr,"Out of bounds access.\n");
+            exit(1);
+            return 1;
+        }
+    }
+    return 0;
+}
+int main(int argc, char* argv[]){
+    if (argc != 2){
+        fprintf(stderr, "Usage: %s <source_file>\n",argv[0]);
+        exit(1);
+    }
+    bf_state* state = createInterpreter(argv[1]);
+    printf("Cmds-count : %zu\n",state->cmds_count);
+    printf("Cmds : %s\n\n",state->cmds);
+    int result = runInterpreter(state);
+    if (result != 0) {
+        printf("Something went wrong during execution.\n");
+        exit(1);
+    }
+    destroyInterpreter(&state);
     return 0;
 }

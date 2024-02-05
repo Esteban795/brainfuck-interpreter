@@ -23,5 +23,6 @@ bf_state* createInterpreter(const char* source_path);
 
 void destroyInterpreter(bf_state** state);
 
-void runInterpreter(bf_state* state);
+int runInterpreter(bf_state* state);
+
 #endif
