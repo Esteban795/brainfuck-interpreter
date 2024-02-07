@@ -24,6 +24,31 @@ static size_t countCmds(FILE* f){
     return count;
 }
 
+static int checkMatchingBrackets(bf_state* state){
+    char c;
+    size_t i = 0;
+    int stack = 0;
+    while ((c = state->cmds[i]) != '\0'){
+        if (c == '['){
+            stack++;
+        } else if (c == ']'){
+            stack--;
+        }
+        if (stack < 0){
+            fprintf(stderr, "Error: Unmatched ']' at position %zu\n",i);
+            destroyInterpreter(&state);
+            return 1;
+        }
+        i++;
+    }
+    if (stack > 0){
+        fprintf(stderr, "Error: Unmatched '['\n");
+        destroyInterpreter(&state);
+        return 1;
+    }
+    return 0;
+}
+
 //Assumes f is a valid file pointer
 static int removeNonCodeChar(bf_state* state,FILE* f){
     size_t cmds_count = countCmds(f);
@@ -76,9 +101,11 @@ bf_state* createInterpreter(const char* source_path){
         return NULL;
     }
     state->ptr = 0;
-    return removeNonCodeChar(state, f) == 0 ? state : NULL;
+    if (removeNonCodeChar(state, f) != 0 || checkMatchingBrackets(state) != 0){
+        return NULL;
+    }
+    return state;
 }
-
 
 void destroyInterpreter(bf_state** state){
     free((*state)->arr);
@@ -86,7 +113,6 @@ void destroyInterpreter(bf_state** state){
     free(*state);
     *state = NULL; //makes sure cannot be double freed
 }
-
 
 static void goToOpeningBracket(bf_state *bfp, int *cptr) {
     int nest = 0;
@@ -115,6 +141,7 @@ static void goToClosingBracket(bf_state *bfp, int *cptr) {
         *cptr += 1;
     }
 }
+
 int runInterpreter(bf_state* state){
     int cmd_ptr = 0;
     while (state->cmds[cmd_ptr]) {
@@ -170,12 +197,17 @@ int runInterpreter(bf_state* state){
     }
     return 0;
 }
+
 int main(int argc, char* argv[]){
     if (argc != 2){
         fprintf(stderr, "Usage: %s <source_file>\n",argv[0]);
         exit(1);
     }
     bf_state* state = createInterpreter(argv[1]);
+    if (state == NULL){
+        fprintf(stderr, "Error: Could not create interpreter.\n");
+        exit(1);
+    }
     printf("Cmds-count : %zu\n",state->cmds_count);
     printf("Cmds : %s\n\n",state->cmds);
     int result = runInterpreter(state);
